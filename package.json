@@ -1,0 +1,14 @@
+{
+  "name": "sk-hynix-arbitrage",
+  "version": "1.0.0",
+  "description": "SK Hynix Gate/OKX arbitrage monitor",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "puppeteer": "^21.11.0",
+    "socket.io": "^4.7.4"
+  }
+}

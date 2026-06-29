@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SK Hynix 套利監控</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>SK Hynix 跨所套利監控</h1>
+      <div class="header-right">
+        <span id="marketStatus" class="badge">載入中...</span>
+        <span id="fundingRate" class="badge">資金費率: --</span>
+        <span id="lastUpdate" class="badge">--</span>
+      </div>
+    </header>
+
+    <div class="grid">
+      <div class="card gate-card">
+        <div class="card-header">
+          <h2>Gate Stocks — 買入</h2>
+        </div>
+        <div class="card-body">
+          <div class="price-row">
+            <span class="label">現價 (KRW)</span>
+            <span class="value main" id="gatePriceKrw">--</span>
+          </div>
+          <div class="price-row">
+            <span class="label">換算 USD</span>
+            <span class="value main" id="gatePriceUsd">--</span>
+          </div>
+          <div class="price-row">
+            <span class="label">Bid / Ask (KRW)</span>
+            <span class="value" id="gateBidAskKrw">--</span>
+          </div>
+          <div class="price-row">
+            <span class="label">Bid / Ask (USD)</span>
+            <span class="value" id="gateBidAskUsd">--</span>
+          </div>
+          <div class="price-row adjusted">
+            <span class="label">Bid 調整 (USD −$3)</span>
+            <span class="value" id="gateBidAdj">--</span>
+          </div>
+          <div class="price-row adjusted">
+            <span class="label">Ask 調整 (USD +$3)</span>
+            <span class="value" id="gateAskAdj">--</span>
+          </div>
+          <div class="price-row" style="font-size:0.76rem">
+            <span class="label">日範圍 / 昨收</span>
+            <span class="value" id="gateDayRange" style="color:#6a6a8a">--</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card okx-card">
+        <div class="card-header">
+          <h2>OKX 永續合約 — 賣出</h2>
+        </div>
+        <div class="card-body">
+          <div class="price-row">
+            <span class="label">最新價 (USDT)</span>
+            <span class="value main" id="okxLast">--</span>
+          </div>
+          <div class="price-row">
+            <span class="label">Bid / Ask</span>
+            <span class="value" id="okxBidAsk">--</span>
+          </div>
+          <div class="price-row">
+            <span class="label">資金費率</span>
+            <span class="value" id="okxFr">--</span>
+          </div>
+          <div class="price-row">
+            <span class="label">下次結算</span>
+            <span class="value" id="okxNextFr">--</span>
+          </div>
+          <div class="price-row" style="font-size:0.76rem">
+            <span class="label">合約</span>
+            <span class="value" style="color:#6a6a8a">SKHYNIX-USDT-SWAP</span>
+          </div>
+          <div class="price-row" style="font-size:0.76rem">
+            <span class="label">24h 高低</span>
+            <span class="value" id="okxRange" style="color:#6a6a8a">--</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card signal-card">
+        <div class="card-header">
+          <h2>交易訊號</h2>
+        </div>
+        <div class="card-body">
+          <div id="signalIndicator" class="signal-indicator wait">●</div>
+          <div id="signalType" class="signal-type">等待中</div>
+          <div id="signalMessage" class="signal-message">--</div>
+          <div class="spread-gauge"><div id="spreadGaugeFill" class="spread-gauge-fill wait"></div></div>
+          <div class="spread-detail">
+            <div class="spread-item">
+              <span>進場 (Gate Ask Adj − OKX Bid)</span>
+              <span id="entrySpread" class="spread-value">--</span>
+            </div>
+            <div class="spread-item">
+              <span>出場 (Gate Bid Adj − OKX Ask)</span>
+              <span id="exitSpread" class="spread-value">--</span>
+            </div>
+          </div>
+          <div class="fx-row">
+            <span id="fxInfo">匯率: --</span>
+            <span id="dataSource">來源: --</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="charts-row">
+      <div class="card chart-card">
+        <div class="card-header">
+          <h2>價格走勢</h2>
+        </div>
+        <div class="card-body">
+          <canvas id="priceChart"></canvas>
+        </div>
+      </div>
+      <div class="card chart-card">
+        <div class="card-header">
+          <h2>價差走勢</h2>
+        </div>
+        <div class="card-body">
+          <canvas id="spreadChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>策略說明</h2>
+      </div>
+      <div class="card-body">
+        <div class="strategy-rules">
+          <div class="rule">
+            <span class="rule-icon enter">→</span>
+            <div>
+              <strong>進場</strong>：
+              <span class="highlight">Gate Ask(USD) + $3 <span class="arrow">&lt;</span> OKX Bid</span>
+              → Gate買進股票 + OKX做空永續
+            </div>
+          </div>
+          <div class="rule">
+            <span class="rule-icon exit">←</span>
+            <div>
+              <strong>出場</strong>：
+              <span class="highlight">Gate Bid(USD) − $3 <span class="arrow">&gt;</span> OKX Ask</span>
+              → 平倉出場
+            </div>
+          </div>
+          <div class="rule">
+            <span class="rule-icon info">i</span>
+            <div class="note-text">
+              Gate 價格爬取自 Gate Stocks 即時頁面 (Puppeteer)，Bid/Ask 為真實訂單簿報價，24h 交易。匯率每小時更新。
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
